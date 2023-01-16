@@ -11,17 +11,30 @@ import (
 	"log"
 	_ "postgres_performance_test/migration"
 	"postgres_performance_test/pkg/keyboard"
+	"sync"
 	"time"
 )
 
 var amount int
+var poolCount int
 var commandCounter = 0
+
+var wg sync.WaitGroup
 
 func main() {
 	var err error
-	amount, err = keyboard.GetIntegerInput()
+	amount, err = keyboard.GetIntegerInput("Enter table rows count ")
 	if err != nil {
 		panic(err)
+	}
+
+	poolCount, err = keyboard.GetIntegerInput("Enter connection pool size ")
+	if err != nil {
+		panic(err)
+	}
+
+	if poolCount <= 0 {
+		poolCount = 100
 	}
 
 	start := time.Now()
@@ -107,17 +120,28 @@ func insertUsers(db *sql.DB) {
 	start := time.Now()
 	log.Print("========== INSERT ============")
 	log.Printf("Insert %d users in progress...", amount)
-	n := 1
-	for n < amount {
-		sqlStatement := `INSERT INTO users (id, name, description) VALUES ($1, $2, $3)`
-		name := fmt.Sprint("name_", n)
-		descr := fmt.Sprint("descr_", n)
-		_, err := db.Exec(sqlStatement, n, name, descr)
-		if err != nil {
-			panic(err)
-		}
-		n++
+	log.Printf("Use connection pool size = %d", poolCount)
+	countInWorker := int(amount / poolCount)
+
+	for i := 0; i < poolCount; i++ {
+		wg.Add(1)
+		go func(db *sql.DB, countInWorker, i int) {
+			defer wg.Done()
+			maxDiapason := (i + 1) * countInWorker
+			for currentPosition := i * countInWorker; currentPosition < maxDiapason; currentPosition++ {
+				sqlStatement := `INSERT INTO users (id, name, description) VALUES ($1, $2, $3)`
+				name := fmt.Sprint("name_", currentPosition)
+				descr := fmt.Sprint("descr_", currentPosition)
+				_, err := db.Exec(sqlStatement, currentPosition, name, descr)
+				if err != nil {
+					panic(err)
+				}
+			}
+		}(db, countInWorker, i)
 	}
+
+	wg.Wait()
+
 	t := time.Now()
 	elapsed := t.Sub(start)
 

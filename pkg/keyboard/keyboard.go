@@ -9,10 +9,10 @@ import (
 	"strings"
 )
 
-func GetIntegerInput() (int, error) {
-	var amount int
+func GetIntegerInput(message string) (int, error) {
+	var inputInteger int
 
-	fmt.Print("Enter table rows count ")
+	fmt.Print(message)
 	reader := bufio.NewReader(os.Stdin)
 	input, err := reader.ReadString('\n')
 	if err != nil {
@@ -20,14 +20,14 @@ func GetIntegerInput() (int, error) {
 	}
 
 	input = strings.TrimSpace(input)
-	amount, err = strconv.Atoi(input)
+	inputInteger, err = strconv.Atoi(input)
 	if err != nil {
 		return 0, err
 	}
 
-	if amount <= 0 {
-		return 0, errors.New("rows count must be positive")
+	if inputInteger <= 0 {
+		return 0, errors.New("input digit must be positive")
 	}
 
-	return amount, nil
+	return inputInteger, nil
 }
