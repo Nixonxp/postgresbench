@@ -17,6 +17,7 @@ import (
 
 var amount int
 var poolCount int
+var countInWorker int
 var commandCounter = 0
 
 var wg sync.WaitGroup
@@ -36,6 +37,8 @@ func main() {
 	if poolCount <= 0 {
 		poolCount = 100
 	}
+
+	countInWorker = int(amount / poolCount)
 
 	start := time.Now()
 	log.Print("========== START ============")
@@ -121,7 +124,6 @@ func insertUsers(db *sql.DB) {
 	log.Print("========== INSERT ============")
 	log.Printf("Insert %d users in progress...", amount)
 	log.Printf("Use connection pool size = %d", poolCount)
-	countInWorker := int(amount / poolCount)
 
 	for i := 0; i < poolCount; i++ {
 		wg.Add(1)
@@ -153,16 +155,26 @@ func insertArticles(db *sql.DB) {
 	start := time.Now()
 	log.Print("========== INSERT ARTICLES ============")
 	log.Printf("Insert %d users in progress...", amount)
-	n := 1
-	for n < amount {
-		sqlStatement := `INSERT INTO articles (id, author_id, title, text) VALUES ($1, $2, $3, $4)`
-		title := fmt.Sprint("title_", n)
-		_, err := db.Exec(sqlStatement, n, n, title, lorem.Paragraph(50, 70))
-		if err != nil {
-			panic(err)
-		}
-		n++
+	log.Printf("Use connection pool size = %d", poolCount)
+
+	for i := 0; i < poolCount; i++ {
+		wg.Add(1)
+		go func(db *sql.DB, countInWorker, i int) {
+			defer wg.Done()
+			maxDiapason := (i + 1) * countInWorker
+			for currentPosition := i * countInWorker; currentPosition < maxDiapason; currentPosition++ {
+				sqlStatement := `INSERT INTO articles (id, author_id, title, text) VALUES ($1, $2, $3, $4)`
+				title := fmt.Sprint("title_", currentPosition)
+				_, err := db.Exec(sqlStatement, currentPosition, currentPosition, title, lorem.Paragraph(50, 70))
+				if err != nil {
+					panic(err)
+				}
+			}
+		}(db, countInWorker, i)
 	}
+
+	wg.Wait()
+
 	t := time.Now()
 	elapsed := t.Sub(start)
 
@@ -174,16 +186,26 @@ func insertComments(db *sql.DB) {
 	start := time.Now()
 	log.Print("========== INSERT COMMENTS ============")
 	log.Printf("Insert %d users in progress...", amount)
-	n := 1
-	for n < amount {
-		sqlStatement := `INSERT INTO comments (id, author_id, article_id, title, text) VALUES ($1, $2, $3, $4, $5)`
-		title := fmt.Sprint("title_", n)
-		_, err := db.Exec(sqlStatement, n, n, n, title, lorem.Paragraph(50, 70))
-		if err != nil {
-			panic(err)
-		}
-		n++
+	log.Printf("Use connection pool size = %d", poolCount)
+
+	for i := 0; i < poolCount; i++ {
+		wg.Add(1)
+		go func(db *sql.DB, countInWorker, i int) {
+			defer wg.Done()
+			maxDiapason := (i + 1) * countInWorker
+			for currentPosition := i * countInWorker; currentPosition < maxDiapason; currentPosition++ {
+				sqlStatement := `INSERT INTO comments (id, author_id, article_id, title, text) VALUES ($1, $2, $3, $4, $5)`
+				title := fmt.Sprint("title_", currentPosition)
+				_, err := db.Exec(sqlStatement, currentPosition, currentPosition, currentPosition, title, lorem.Paragraph(50, 70))
+				if err != nil {
+					panic(err)
+				}
+			}
+		}(db, countInWorker, i)
 	}
+
+	wg.Wait()
+
 	t := time.Now()
 	elapsed := t.Sub(start)
 
@@ -195,15 +217,24 @@ func selectFromIdUsers(db *sql.DB) {
 	start := time.Now()
 	log.Print("======= SELECT FROM ID =======")
 	log.Printf("Select %d users in progress...", amount)
-	n := 1
-	for n < amount {
-		sqlStatement := `SELECT * FROM users WHERE id = $1`
-		_, err := db.Exec(sqlStatement, n)
-		if err != nil {
-			panic(err)
-		}
-		n++
+
+	for i := 0; i < poolCount; i++ {
+		wg.Add(1)
+		go func(db *sql.DB, countInWorker, i int) {
+			defer wg.Done()
+			maxDiapason := (i + 1) * countInWorker
+			for currentPosition := i * countInWorker; currentPosition < maxDiapason; currentPosition++ {
+				sqlStatement := `SELECT * FROM users WHERE id = $1`
+				_, err := db.Exec(sqlStatement, currentPosition)
+				if err != nil {
+					panic(err)
+				}
+			}
+		}(db, countInWorker, i)
 	}
+
+	wg.Wait()
+
 	t := time.Now()
 	elapsed := t.Sub(start)
 
