@@ -11,7 +11,7 @@ func init() {
 
 func upAddArticles(tx *sql.Tx) error {
 	query := `create table articles (
-	id          bigint       not null primary key,
+	id          serial       not null primary key,
 	author_id   bigint references public.users (id),
 	title          TEXT NOT NULL,
     text   TEXT NOT NULL);`

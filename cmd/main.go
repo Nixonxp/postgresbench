@@ -1,17 +1,16 @@
 package main
 
 import (
-	"bufio"
 	"database/sql"
 	"flag"
 	"fmt"
+	lorem "github.com/drhodes/golorem"
+	"github.com/lib/pq"
 	_ "github.com/lib/pq"
 	"github.com/pressly/goose/v3"
 	"log"
-	"os"
 	_ "postgres_performance_test/migration"
-	"strconv"
-	"strings"
+	"postgres_performance_test/pkg/keyboard"
 	"time"
 )
 
@@ -19,18 +18,10 @@ var amount int
 var commandCounter = 0
 
 func main() {
-	fmt.Print("Enter table rows count ")
-	reader := bufio.NewReader(os.Stdin)
-	input, err := reader.ReadString('\n')
+	var err error
+	amount, err = keyboard.GetIntegerInput()
 	if err != nil {
-		log.Fatal(err)
-	}
-
-	input = strings.TrimSpace(input)
-	amount, err = strconv.Atoi(input)
-
-	if amount <= 0 {
-		log.Fatal("Rows count must be positive")
+		panic(err)
 	}
 
 	start := time.Now()
@@ -40,11 +31,19 @@ func main() {
 	dir := flag.String("dir", "./migration", "migration dir")
 	flag.Parse()
 
-	dsn := "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable"
+	dsn := "postgres://test:test@localhost:5432/test?sslmode=disable"
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		log.Fatalf("-dbstring=%q: %v\n", dsn, err)
 	}
+
+	defer func(db *sql.DB) {
+		err := db.Close()
+		if err != nil {
+			panic(err)
+		}
+		log.Print("db connection closed")
+	}(db)
 
 	if err := goose.SetDialect("postgres"); err != nil {
 		panic(err)
@@ -91,6 +90,12 @@ func main() {
 	// drop column test
 	dropColumn(db)
 
+	// multiline insert
+	multilineInsertArticles(db)
+
+	// bulk insert
+	bulkCopy(db)
+
 	t := time.Now()
 	elapsed := t.Sub(start)
 
@@ -128,8 +133,7 @@ func insertArticles(db *sql.DB) {
 	for n < amount {
 		sqlStatement := `INSERT INTO articles (id, author_id, title, text) VALUES ($1, $2, $3, $4)`
 		title := fmt.Sprint("title_", n)
-		text := fmt.Sprint("text_", n)
-		_, err := db.Exec(sqlStatement, n, n, title, text)
+		_, err := db.Exec(sqlStatement, n, n, title, lorem.Paragraph(50, 70))
 		if err != nil {
 			panic(err)
 		}
@@ -150,8 +154,7 @@ func insertComments(db *sql.DB) {
 	for n < amount {
 		sqlStatement := `INSERT INTO comments (id, author_id, article_id, title, text) VALUES ($1, $2, $3, $4, $5)`
 		title := fmt.Sprint("title_", n)
-		text := fmt.Sprint("text_", n)
-		_, err := db.Exec(sqlStatement, n, n, n, title, text)
+		_, err := db.Exec(sqlStatement, n, n, n, title, lorem.Paragraph(50, 70))
 		if err != nil {
 			panic(err)
 		}
@@ -299,6 +302,77 @@ func addNullableWithDefault(db *sql.DB) {
 	elapsed := t.Sub(start)
 
 	log.Printf("Inserted new column with default value in %s", elapsed)
+	log.Print("==============================")
+}
+
+func multilineInsertArticles(db *sql.DB) {
+	start := time.Now()
+	log.Print("========== MULTILINE INSERT ARTICLES ============")
+	log.Printf("Multiline insert %d articles in progress...", amount)
+
+	sqlStatement := "INSERT INTO articles (id, author_id, title, text) VALUES "
+
+	for n := 1; n < amount; n++ {
+		title := fmt.Sprint("title_", n)
+		sqlStatement += fmt.Sprintf(" (%d, %d, '%s', '%s') ", n+amount*1, n, title, lorem.Paragraph(10, 15))
+		if n+1 != amount {
+			sqlStatement += ","
+		}
+	}
+
+	_, err := db.Exec(sqlStatement)
+	if err != nil {
+		panic(err)
+	}
+
+	t := time.Now()
+	elapsed := t.Sub(start)
+
+	log.Printf("Multiline inserted %d rows in %s", amount, elapsed)
+	log.Print("==============================")
+}
+
+func bulkCopy(db *sql.DB) {
+	start := time.Now()
+	log.Print("========== BULK INSERT ARTICLES ============")
+	log.Printf("Bulk insert %d articles in progress...", amount)
+
+	tx, err := db.Begin()
+
+	if err != nil {
+		panic(err)
+	}
+
+	stmt, err := tx.Prepare(pq.CopyInSchema("public", "articles", "id", "author_id", "title", "text"))
+	if err != nil {
+		panic(err)
+	}
+
+	for n := 1; n < amount; n++ {
+		title := fmt.Sprint("title_", n)
+		_, err := stmt.Exec(n+amount*2, n, title, lorem.Paragraph(10, 15))
+		if err != nil {
+			return
+		}
+	}
+
+	_, err = stmt.Exec()
+	if err != nil {
+		panic(err)
+	}
+	err = stmt.Close()
+	if err != nil {
+		panic(err)
+	}
+	err = tx.Commit()
+	if err != nil {
+		panic(err)
+	}
+
+	t := time.Now()
+	elapsed := t.Sub(start)
+
+	log.Printf("Bulk inserted %d rows in %s", amount, elapsed)
 	log.Print("==============================")
 }
 
