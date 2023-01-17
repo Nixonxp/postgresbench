@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
-	lorem "github.com/drhodes/golorem"
 	"github.com/lib/pq"
 	_ "github.com/lib/pq"
 	"github.com/pressly/goose/v3"
@@ -19,6 +18,7 @@ var amount int
 var poolCount int
 var countInWorker int
 var commandCounter = 0
+var loremText = "Lorem Ipsum - это текст-\"рыба\", часто используемый в печати и вэб-дизайне. Lorem Ipsum является стандартной \"рыбой\" для текстов на латинице с начала XVI века. В то время некий безымянный печатник создал большую коллекцию размеров и форм шрифтов, используя Lorem Ipsum для распечатки образцов. Lorem Ipsum не только успешно пережил без заметных изменений пять веков, но и перешагнул в электронный дизайн. Его популяризации в новое время послужили публикация листов Letraset с образцами Lorem Ipsum в 60-х годах и, в более недавнее время, программы электронной вёрстки типа Aldus PageMaker, в шаблонах которых используется Lorem Ipsum."
 
 var wg sync.WaitGroup
 
@@ -171,7 +171,7 @@ func insertArticles(db *sql.DB) {
 			for currentPosition := i * countInWorker; currentPosition < maxDiapason; currentPosition++ {
 				sqlStatement := `INSERT INTO articles (id, author_id, title, text) VALUES ($1, $2, $3, $4)`
 				title := fmt.Sprint("title_", currentPosition)
-				_, err := db.Exec(sqlStatement, currentPosition, currentPosition, title, lorem.Paragraph(50, 70))
+				_, err := db.Exec(sqlStatement, currentPosition, currentPosition, title, loremText)
 				if err != nil {
 					panic(err)
 				}
@@ -202,7 +202,7 @@ func insertArticlesWithoutReferences(db *sql.DB) {
 			for currentPosition := i * countInWorker; currentPosition < maxDiapason; currentPosition++ {
 				sqlStatement := `INSERT INTO articles_simple (id, author_id, title, text) VALUES ($1, $2, $3, $4)`
 				title := fmt.Sprint("title_", currentPosition)
-				_, err := db.Exec(sqlStatement, currentPosition, currentPosition, title, lorem.Paragraph(50, 70))
+				_, err := db.Exec(sqlStatement, currentPosition, currentPosition, title, loremText)
 				if err != nil {
 					panic(err)
 				}
@@ -233,7 +233,7 @@ func insertComments(db *sql.DB) {
 			for currentPosition := i * countInWorker; currentPosition < maxDiapason; currentPosition++ {
 				sqlStatement := `INSERT INTO comments (id, author_id, article_id, title, text) VALUES ($1, $2, $3, $4, $5)`
 				title := fmt.Sprint("title_", currentPosition)
-				_, err := db.Exec(sqlStatement, currentPosition, currentPosition, currentPosition, title, lorem.Paragraph(50, 70))
+				_, err := db.Exec(sqlStatement, currentPosition, currentPosition, currentPosition, title, loremText)
 				if err != nil {
 					panic(err)
 				}
@@ -264,7 +264,7 @@ func insertCommentsWithoutReferences(db *sql.DB) {
 			for currentPosition := i * countInWorker; currentPosition < maxDiapason; currentPosition++ {
 				sqlStatement := `INSERT INTO comments_simple (id, author_id, article_id, title, text) VALUES ($1, $2, $3, $4, $5)`
 				title := fmt.Sprint("title_", currentPosition)
-				_, err := db.Exec(sqlStatement, currentPosition, currentPosition, currentPosition, title, lorem.Paragraph(50, 70))
+				_, err := db.Exec(sqlStatement, currentPosition, currentPosition, currentPosition, title, loremText)
 				if err != nil {
 					panic(err)
 				}
@@ -437,7 +437,7 @@ func multilineInsertArticles(db *sql.DB) {
 
 	for n := 1; n < amount; n++ {
 		title := fmt.Sprint("title_", n)
-		sqlStatement += fmt.Sprintf(" (%d, %d, '%s', '%s') ", n+amount*1, n, title, lorem.Paragraph(10, 15))
+		sqlStatement += fmt.Sprintf(" (%d, %d, '%s', '%s') ", n+amount*1, n, title, loremText)
 		if n+1 != amount {
 			sqlStatement += ","
 		}
@@ -473,7 +473,7 @@ func bulkCopy(db *sql.DB) {
 
 	for n := 1; n < amount; n++ {
 		title := fmt.Sprint("title_", n)
-		_, err := stmt.Exec(n+amount*2, n, title, lorem.Paragraph(10, 15))
+		_, err := stmt.Exec(n+amount*2, n, title, loremText)
 		if err != nil {
 			return
 		}
