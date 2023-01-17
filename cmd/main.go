@@ -77,13 +77,19 @@ func main() {
 	nextMigrate(db, dir)
 	// add comments
 	nextMigrate(db, dir)
+	// add simple articles and comments table
+	nextMigrate(db, dir)
 
 	// add users
 	insertUsers(db)
 	// add articles
 	insertArticles(db)
+	// add articles without references
+	insertArticlesWithoutReferences(db)
 	// add comments
 	insertComments(db)
+	// add comments without references
+	insertCommentsWithoutReferences(db)
 
 	// select users
 	selectFromIdUsers(db)
@@ -182,6 +188,37 @@ func insertArticles(db *sql.DB) {
 	log.Print("==============================")
 }
 
+func insertArticlesWithoutReferences(db *sql.DB) {
+	start := time.Now()
+	log.Print("========== INSERT ARTICLES WITHOUT REFERENCES =================")
+	log.Printf("Insert %d users in progress...", amount)
+	log.Printf("Use connection pool size = %d", poolCount)
+
+	for i := 0; i < poolCount; i++ {
+		wg.Add(1)
+		go func(db *sql.DB, countInWorker, i int) {
+			defer wg.Done()
+			maxDiapason := (i + 1) * countInWorker
+			for currentPosition := i * countInWorker; currentPosition < maxDiapason; currentPosition++ {
+				sqlStatement := `INSERT INTO articles_simple (id, author_id, title, text) VALUES ($1, $2, $3, $4)`
+				title := fmt.Sprint("title_", currentPosition)
+				_, err := db.Exec(sqlStatement, currentPosition, currentPosition, title, lorem.Paragraph(50, 70))
+				if err != nil {
+					panic(err)
+				}
+			}
+		}(db, countInWorker, i)
+	}
+
+	wg.Wait()
+
+	t := time.Now()
+	elapsed := t.Sub(start)
+
+	log.Printf("Inserted %d rows in %s", amount, elapsed)
+	log.Print("==============================")
+}
+
 func insertComments(db *sql.DB) {
 	start := time.Now()
 	log.Print("========== INSERT COMMENTS ============")
@@ -195,6 +232,37 @@ func insertComments(db *sql.DB) {
 			maxDiapason := (i + 1) * countInWorker
 			for currentPosition := i * countInWorker; currentPosition < maxDiapason; currentPosition++ {
 				sqlStatement := `INSERT INTO comments (id, author_id, article_id, title, text) VALUES ($1, $2, $3, $4, $5)`
+				title := fmt.Sprint("title_", currentPosition)
+				_, err := db.Exec(sqlStatement, currentPosition, currentPosition, currentPosition, title, lorem.Paragraph(50, 70))
+				if err != nil {
+					panic(err)
+				}
+			}
+		}(db, countInWorker, i)
+	}
+
+	wg.Wait()
+
+	t := time.Now()
+	elapsed := t.Sub(start)
+
+	log.Printf("Inserted %d rows in %s", amount, elapsed)
+	log.Print("==============================")
+}
+
+func insertCommentsWithoutReferences(db *sql.DB) {
+	start := time.Now()
+	log.Print("========== INSERT COMMENTS WITHOUT REFERENCES =================")
+	log.Printf("Insert %d users in progress...", amount)
+	log.Printf("Use connection pool size = %d", poolCount)
+
+	for i := 0; i < poolCount; i++ {
+		wg.Add(1)
+		go func(db *sql.DB, countInWorker, i int) {
+			defer wg.Done()
+			maxDiapason := (i + 1) * countInWorker
+			for currentPosition := i * countInWorker; currentPosition < maxDiapason; currentPosition++ {
+				sqlStatement := `INSERT INTO comments_simple (id, author_id, article_id, title, text) VALUES ($1, $2, $3, $4, $5)`
 				title := fmt.Sprint("title_", currentPosition)
 				_, err := db.Exec(sqlStatement, currentPosition, currentPosition, currentPosition, title, lorem.Paragraph(50, 70))
 				if err != nil {
