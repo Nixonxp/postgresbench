@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"database/sql"
 	"flag"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"log"
 	_ "postgres_performance_test/migration"
 	"postgres_performance_test/pkg/keyboard"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -433,17 +435,17 @@ func multilineInsertArticles(db *sql.DB) {
 	log.Print("========== MULTILINE INSERT ARTICLES ============")
 	log.Printf("Multiline insert %d articles in progress...", amount)
 
-	sqlStatement := "INSERT INTO articles (id, author_id, title, text) VALUES "
+	var buffer bytes.Buffer
+	buffer.WriteString("INSERT INTO articles (id, author_id, title, text) VALUES ")
 
 	for n := 1; n < amount; n++ {
-		title := fmt.Sprint("title_", n)
-		sqlStatement += fmt.Sprintf(" (%d, %d, '%s', '%s') ", n+amount*1, n, title, loremText)
+		buffer.WriteString(fmt.Sprintf(" (%d, %d, '%s', '%s') ", n+amount*1, n, "title_"+strconv.Itoa(n), "text article"))
 		if n+1 != amount {
-			sqlStatement += ","
+			buffer.WriteString(",")
 		}
 	}
 
-	_, err := db.Exec(sqlStatement)
+	_, err := db.Exec(buffer.String())
 	if err != nil {
 		panic(err)
 	}
