@@ -8,3 +8,16 @@ services:
       POSTGRES_PASSWORD: test
     ports:
       - "5432:5432"
+  mongo:
+    image: mongo:6.0.3
+    container_name: mongodb
+    environment:
+      - MONGO_INITDB_DATABASE=test
+      - MONGO_INITDB_ROOT_USERNAME=root
+      - MONGO_INITDB_ROOT_PASSWORD=root
+    ports: [ "27017:27017" ]
+    volumes:
+      - mongodb_data_container:/data/db
+
+volumes:
+  mongodb_data_container:
