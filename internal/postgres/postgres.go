@@ -8,6 +8,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/pressly/goose/v3"
 	"log"
+	"math/rand"
 	"strconv"
 	"sync"
 	"time"
@@ -17,13 +18,18 @@ var amount int
 var poolCount int
 var countInWorker int
 var commandCounter = 0
+var isUseTestSchema = false
 var loremText = "Lorem Ipsum - это текст-\"рыба\", часто используемый в печати и вэб-дизайне. Lorem Ipsum является стандартной \"рыбой\" для текстов на латинице с начала XVI века. В то время некий безымянный печатник создал большую коллекцию размеров и форм шрифтов, используя Lorem Ipsum для распечатки образцов. Lorem Ipsum не только успешно пережил без заметных изменений пять веков, но и перешагнул в электронный дизайн. Его популяризации в новое время послужили публикация листов Letraset с образцами Lorem Ipsum в 60-х годах и, в более недавнее время, программы электронной вёрстки типа Aldus PageMaker, в шаблонах которых используется Lorem Ipsum."
 
 var wg sync.WaitGroup
 
-func StartTest(amountRows, poolCountSize, passTestCount, runMigrations int) {
+func StartTest(amountRows, poolCountSize, passTestCount, runMigrations, useTestSchema int) {
 	amount = amountRows
 	poolCount = poolCountSize
+
+	if useTestSchema != 0 {
+		isUseTestSchema = true
+	}
 
 	countInWorker = int(amount / poolCount)
 
@@ -138,6 +144,11 @@ func StartTest(amountRows, poolCountSize, passTestCount, runMigrations int) {
 }
 
 func insertUsers(db *sql.DB) {
+	if isUseTestSchema == true {
+		amount = 100000
+	}
+	countInWorker = int(amount / poolCount)
+
 	start := time.Now()
 	log.Print("========== INSERT ============")
 	log.Printf("Insert %d users in progress...", amount)
@@ -169,7 +180,17 @@ func insertUsers(db *sql.DB) {
 	log.Print("==============================")
 }
 
+func getRandomInt(min, max int) int {
+	rand.Seed(time.Now().UnixNano())
+	return rand.Intn(max-min) + min
+}
+
 func insertArticles(db *sql.DB) {
+	if isUseTestSchema == true {
+		amount = 1000000
+	}
+	countInWorker = int(amount / poolCount)
+	var authorId int
 	start := time.Now()
 	log.Print("========== INSERT ARTICLES ============")
 	log.Printf("Insert %d articles in progress...", amount)
@@ -183,7 +204,14 @@ func insertArticles(db *sql.DB) {
 			for currentPosition := i * countInWorker; currentPosition < maxDiapason; currentPosition++ {
 				sqlStatement := `INSERT INTO articles (id, author_id, title, text) VALUES ($1, $2, $3, $4)`
 				title := fmt.Sprint("title_", currentPosition)
-				_, err := db.Exec(sqlStatement, currentPosition, currentPosition, title, loremText)
+
+				if isUseTestSchema == true {
+					authorId = getRandomInt(0, 100000)
+				} else {
+					authorId = currentPosition
+				}
+
+				_, err := db.Exec(sqlStatement, currentPosition, authorId, title, loremText)
 				if err != nil {
 					panic(err)
 				}
@@ -232,6 +260,13 @@ func insertArticlesWithoutReferences(db *sql.DB) {
 }
 
 func insertComments(db *sql.DB) {
+	if isUseTestSchema == true {
+		amount = 10000000
+	}
+	countInWorker = int(amount / poolCount)
+	var authorId int
+	var articleId int
+
 	start := time.Now()
 	log.Print("========== INSERT COMMENTS ============")
 	log.Printf("Insert %d users in progress...", amount)
@@ -245,7 +280,16 @@ func insertComments(db *sql.DB) {
 			for currentPosition := i * countInWorker; currentPosition < maxDiapason; currentPosition++ {
 				sqlStatement := `INSERT INTO comments (id, author_id, article_id, title, text) VALUES ($1, $2, $3, $4, $5)`
 				title := fmt.Sprint("title_", currentPosition)
-				_, err := db.Exec(sqlStatement, currentPosition, currentPosition, currentPosition, title, loremText)
+
+				if isUseTestSchema == true {
+					authorId = getRandomInt(0, 100000)
+					articleId = getRandomInt(0, 1000000)
+				} else {
+					authorId = currentPosition
+					articleId = currentPosition
+				}
+
+				_, err := db.Exec(sqlStatement, currentPosition, authorId, articleId, title, loremText)
 				if err != nil {
 					panic(err)
 				}
@@ -294,6 +338,10 @@ func insertCommentsWithoutReferences(db *sql.DB) {
 }
 
 func selectFromIdUsers(db *sql.DB) {
+	if isUseTestSchema == true {
+		amount = 100000
+	}
+	countInWorker = int(amount / poolCount)
 	start := time.Now()
 	log.Print("======= SELECT FROM ID =======")
 	log.Printf("Select %d users in progress...", amount)
@@ -441,6 +489,9 @@ func addNullableWithDefault(db *sql.DB) {
 }
 
 func multilineInsertArticles(db *sql.DB) {
+	if isUseTestSchema == true {
+		amount = 1000000
+	}
 	start := time.Now()
 	log.Print("========== MULTILINE INSERT ARTICLES ============")
 	log.Printf("Multiline insert %d articles in progress...", amount)
@@ -468,6 +519,9 @@ func multilineInsertArticles(db *sql.DB) {
 }
 
 func bulkCopy(db *sql.DB) {
+	if isUseTestSchema == true {
+		amount = 1000000
+	}
 	start := time.Now()
 	log.Print("========== BULK INSERT ARTICLES ============")
 	log.Printf("Bulk insert %d articles in progress...", amount)

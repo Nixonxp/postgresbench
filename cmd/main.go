@@ -12,15 +12,23 @@ import (
 
 func main() {
 	var err error
+	amount := 10000
 
 	dbType, err := keyboard.GetIntegerInput("Enter DB type: 1 - postgres, 2 - mongodb ")
 	if err != nil {
 		panic(err)
 	}
 
-	amount, err := keyboard.GetIntegerInput("Enter table rows count ")
+	useTestSchema, err := keyboard.GetIntegerInput("Use test schema [100k users, 1 m articles, 10 m comments], 0 - no, 1 - yes , default - 0 :")
 	if err != nil {
-		panic(err)
+		useTestSchema = 0
+	}
+
+	if useTestSchema == 0 {
+		amount, err = keyboard.GetIntegerInput("Enter table rows count ")
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	poolCount, err := keyboard.GetIntegerInput("Enter connection pool size ")
@@ -45,7 +53,7 @@ func main() {
 		if err != nil {
 			runMigrations = 0
 		}
-		postgres.StartTest(amount, poolCount, passTestCount, runMigrations)
+		postgres.StartTest(amount, poolCount, passTestCount, runMigrations, useTestSchema)
 	} else if dbType == 2 {
 		mongodb.StartTest(amount, poolCount, passTestCount)
 	} else {

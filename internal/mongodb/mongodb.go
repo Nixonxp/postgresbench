@@ -2,6 +2,7 @@ package mongodb
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -47,14 +48,22 @@ func StartTest(amountRows, poolCountSize, passTestCount int) {
 	}
 
 	// add users
-	insertUsers(client, ctx)
+	if passTestCount < 1 {
+		insertUsers(client, ctx)
+	}
 	// add articles
-	insertArticles(client, ctx)
+	if passTestCount < 2 {
+		insertArticles(client, ctx)
+	}
 	// add comments
-	insertComments(client, ctx)
+	if passTestCount < 3 {
+		insertComments(client, ctx)
+	}
 
 	// select users
-	//selectFromIdUsers(db)
+	if passTestCount < 4 {
+		selectFromIdUsers(client, ctx)
+	}
 
 	// select with joins
 	//selectWithJoins(db)
@@ -261,6 +270,49 @@ func insertComments(client *mongo.Client, ctx context.Context) {
 				}
 
 				articlesIdContainer.Add(currentPosition, result.InsertedID.(primitive.ObjectID).Hex())
+			}
+		}(collection, countInWorker, i)
+	}
+
+	wg.Wait()
+
+	t := time.Now()
+	elapsed := t.Sub(start)
+
+	log.Printf("Inserted %d rows in %s", amount, elapsed)
+	log.Print("==============================")
+}
+
+func selectFromIdUsers(client *mongo.Client, ctx context.Context) {
+	start := time.Now()
+	log.Print("======= SELECT FROM ID =======")
+	log.Printf("Select %d users in progress...", amount)
+
+	collection := client.Database("test").Collection("users")
+
+	for i := 0; i < poolCount; i++ {
+		wg.Add(1)
+		go func(collection *mongo.Collection, countInWorker, i int) {
+			var _ error
+
+			defer wg.Done()
+			maxDiapason := (i + 1) * countInWorker
+
+			for currentPosition := i * countInWorker; currentPosition < maxDiapason; currentPosition++ {
+				oid, err := primitive.ObjectIDFromHex(usersIdContainer.GetByKey(currentPosition))
+				if err != nil {
+					panic(err)
+				}
+
+				filter := bson.M{"_id": oid}
+
+				result := collection.FindOne(ctx, filter)
+				if result.Err() != nil {
+					if errors.Is(result.Err(), mongo.ErrNoDocuments) {
+						panic("document not found")
+					}
+					panic("failed to find one user by id: %s due to error: %v")
+				}
 			}
 		}(collection, countInWorker, i)
 	}
