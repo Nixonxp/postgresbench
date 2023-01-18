@@ -41,7 +41,11 @@ func main() {
 	log.Print("========== START ============")
 
 	if dbType == 1 {
-		postgres.StartTest(amount, poolCount, passTestCount)
+		runMigrations, err := keyboard.GetIntegerInput("Run migrations 0 - yes, 1 - no, default - 0 ")
+		if err != nil {
+			runMigrations = 0
+		}
+		postgres.StartTest(amount, poolCount, passTestCount, runMigrations)
 	} else if dbType == 2 {
 		mongodb.StartTest(amount, poolCount, passTestCount)
 	} else {

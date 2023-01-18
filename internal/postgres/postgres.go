@@ -21,7 +21,7 @@ var loremText = "Lorem Ipsum - это текст-\"рыба\", часто исп
 
 var wg sync.WaitGroup
 
-func StartTest(amountRows, poolCountSize, passTestCount int) {
+func StartTest(amountRows, poolCountSize, passTestCount, runMigrations int) {
 	amount = amountRows
 	poolCount = poolCountSize
 
@@ -55,14 +55,16 @@ func StartTest(amountRows, poolCountSize, passTestCount int) {
 
 	defer resetMigrations(db, dir)
 
-	// add user tables
-	nextMigrate(db, dir)
-	// add articles table
-	nextMigrate(db, dir)
-	// add comments
-	nextMigrate(db, dir)
-	// add simple articles and comments table
-	nextMigrate(db, dir)
+	if runMigrations == 0 {
+		// add user tables
+		nextMigrate(db, dir)
+		// add articles table
+		nextMigrate(db, dir)
+		// add comments
+		nextMigrate(db, dir)
+		// add simple articles and comments table
+		nextMigrate(db, dir)
+	}
 
 	if passTestCount < 1 {
 		// add users
