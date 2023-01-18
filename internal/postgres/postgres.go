@@ -229,6 +229,10 @@ func insertArticles(db *sql.DB) {
 }
 
 func insertArticlesWithoutReferences(db *sql.DB) {
+	if isUseTestSchema == true {
+		amount = 1000000
+	}
+	countInWorker = int(amount / poolCount)
 	start := time.Now()
 	log.Print("========== INSERT ARTICLES WITHOUT REFERENCES =================")
 	log.Printf("Insert %d users in progress...", amount)
@@ -307,6 +311,10 @@ func insertComments(db *sql.DB) {
 }
 
 func insertCommentsWithoutReferences(db *sql.DB) {
+	if isUseTestSchema == true {
+		amount = 1000000
+	}
+	countInWorker = int(amount / poolCount)
 	start := time.Now()
 	log.Print("========== INSERT COMMENTS WITHOUT REFERENCES =================")
 	log.Printf("Insert %d users in progress...", amount)
