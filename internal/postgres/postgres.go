@@ -8,7 +8,6 @@ import (
 	"github.com/lib/pq"
 	"github.com/pressly/goose/v3"
 	"log"
-	"math/rand"
 	"strconv"
 	"sync"
 	"time"
@@ -180,11 +179,6 @@ func insertUsers(db *sql.DB) {
 	log.Print("==============================")
 }
 
-func getRandomInt(min, max int) int {
-	rand.Seed(time.Now().UnixNano())
-	return rand.Intn(max-min) + min
-}
-
 func insertArticles(db *sql.DB) {
 	if isUseTestSchema == true {
 		amount = 1000000
@@ -205,11 +199,7 @@ func insertArticles(db *sql.DB) {
 				sqlStatement := `INSERT INTO articles (id, author_id, title, text) VALUES ($1, $2, $3, $4)`
 				title := fmt.Sprint("title_", currentPosition)
 
-				if isUseTestSchema == true {
-					authorId = getRandomInt(0, 100000)
-				} else {
-					authorId = currentPosition
-				}
+				authorId = int(currentPosition / 100)
 
 				_, err := db.Exec(sqlStatement, currentPosition, authorId, title, loremText)
 				if err != nil {
@@ -229,10 +219,6 @@ func insertArticles(db *sql.DB) {
 }
 
 func insertArticlesWithoutReferences(db *sql.DB) {
-	if isUseTestSchema == true {
-		amount = 1000000
-	}
-	countInWorker = int(amount / poolCount)
 	start := time.Now()
 	log.Print("========== INSERT ARTICLES WITHOUT REFERENCES =================")
 	log.Printf("Insert %d articles in progress...", amount)
@@ -285,13 +271,8 @@ func insertComments(db *sql.DB) {
 				sqlStatement := `INSERT INTO comments (id, author_id, article_id, title, text) VALUES ($1, $2, $3, $4, $5)`
 				title := fmt.Sprint("title_", currentPosition)
 
-				if isUseTestSchema == true {
-					authorId = getRandomInt(0, 100000)
-					articleId = getRandomInt(0, 1000000)
-				} else {
-					authorId = currentPosition
-					articleId = currentPosition
-				}
+				authorId = int(currentPosition / 1000)
+				articleId = int(currentPosition / 1000)
 
 				_, err := db.Exec(sqlStatement, currentPosition, authorId, articleId, title, loremText)
 				if err != nil {
@@ -311,10 +292,6 @@ func insertComments(db *sql.DB) {
 }
 
 func insertCommentsWithoutReferences(db *sql.DB) {
-	if isUseTestSchema == true {
-		amount = 10000000
-	}
-	countInWorker = int(amount / poolCount)
 	start := time.Now()
 	log.Print("========== INSERT COMMENTS WITHOUT REFERENCES =================")
 	log.Printf("Insert %d comments in progress...", amount)
@@ -551,11 +528,7 @@ func bulkCopy(db *sql.DB) {
 	for n := 1; n < amount; n++ {
 		title := fmt.Sprint("title_", n)
 
-		if isUseTestSchema == true {
-			id = getRandomInt(0, 1000000) + amount*2
-		} else {
-			id = n + amount*2
-		}
+		id = n + amount*2
 
 		_, err := stmt.Exec(id, n, title, loremText)
 		if err != nil {
