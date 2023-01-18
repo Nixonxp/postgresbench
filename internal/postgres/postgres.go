@@ -132,12 +132,12 @@ func StartTest(amountRows, poolCountSize, passTestCount, runMigrations, useTestS
 		dropColumn(db)
 	}
 
-	if passTestCount < 13 {
+	/*if passTestCount < 13 {
 		// multiline insert
 		multilineInsertArticles(db)
-	}
+	}*/
 
-	if passTestCount < 14 {
+	if passTestCount < 13 {
 		// bulk insert
 		bulkCopy(db)
 	}
@@ -235,7 +235,7 @@ func insertArticlesWithoutReferences(db *sql.DB) {
 	countInWorker = int(amount / poolCount)
 	start := time.Now()
 	log.Print("========== INSERT ARTICLES WITHOUT REFERENCES =================")
-	log.Printf("Insert %d users in progress...", amount)
+	log.Printf("Insert %d articles in progress...", amount)
 	log.Printf("Use connection pool size = %d", poolCount)
 
 	for i := 0; i < poolCount; i++ {
@@ -273,7 +273,7 @@ func insertComments(db *sql.DB) {
 
 	start := time.Now()
 	log.Print("========== INSERT COMMENTS ============")
-	log.Printf("Insert %d users in progress...", amount)
+	log.Printf("Insert %d comments in progress...", amount)
 	log.Printf("Use connection pool size = %d", poolCount)
 
 	for i := 0; i < poolCount; i++ {
@@ -312,12 +312,12 @@ func insertComments(db *sql.DB) {
 
 func insertCommentsWithoutReferences(db *sql.DB) {
 	if isUseTestSchema == true {
-		amount = 1000000
+		amount = 10000000
 	}
 	countInWorker = int(amount / poolCount)
 	start := time.Now()
 	log.Print("========== INSERT COMMENTS WITHOUT REFERENCES =================")
-	log.Printf("Insert %d users in progress...", amount)
+	log.Printf("Insert %d comments in progress...", amount)
 	log.Printf("Use connection pool size = %d", poolCount)
 
 	for i := 0; i < poolCount; i++ {
@@ -500,6 +500,7 @@ func multilineInsertArticles(db *sql.DB) {
 	if isUseTestSchema == true {
 		amount = 1000000
 	}
+	countInWorker = int(amount / poolCount)
 	start := time.Now()
 	log.Print("========== MULTILINE INSERT ARTICLES ============")
 	log.Printf("Multiline insert %d articles in progress...", amount)
@@ -530,11 +531,13 @@ func bulkCopy(db *sql.DB) {
 	if isUseTestSchema == true {
 		amount = 1000000
 	}
+	countInWorker = int(amount / poolCount)
 	start := time.Now()
 	log.Print("========== BULK INSERT ARTICLES ============")
 	log.Printf("Bulk insert %d articles in progress...", amount)
 
 	tx, err := db.Begin()
+	var id int
 
 	if err != nil {
 		panic(err)
@@ -547,7 +550,14 @@ func bulkCopy(db *sql.DB) {
 
 	for n := 1; n < amount; n++ {
 		title := fmt.Sprint("title_", n)
-		_, err := stmt.Exec(n+amount*2, n, title, loremText)
+
+		if isUseTestSchema == true {
+			id = getRandomInt(0, 1000000) + amount*2
+		} else {
+			id = n + amount*2
+		}
+
+		_, err := stmt.Exec(id, n, title, loremText)
 		if err != nil {
 			return
 		}
