@@ -528,9 +528,10 @@ func bulkCopy(db *sql.DB) {
 	for n := 1; n < amount; n++ {
 		title := fmt.Sprint("title_", n)
 
+		authorId := int(n / 1000)
 		id = n + amount*2
 
-		_, err := stmt.Exec(id, n, title, loremText)
+		_, err := stmt.Exec(id, authorId, title, loremText)
 		if err != nil {
 			return
 		}
