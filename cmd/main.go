@@ -55,7 +55,7 @@ func main() {
 		}
 		postgres.StartTest(amount, poolCount, passTestCount, runMigrations, useTestSchema)
 	} else if dbType == 2 {
-		mongodb.StartTest(amount, poolCount, passTestCount)
+		mongodb.StartTest(amount, poolCount, passTestCount, useTestSchema)
 	} else {
 		panic("Invalid DB type selected")
 	}

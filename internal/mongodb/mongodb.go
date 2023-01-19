@@ -14,19 +14,25 @@ import (
 	"time"
 )
 
+import mog "go.mongodb.org/mongo-driver/mongo"
+
 var amount int
 var poolCount int
 var countInWorker int
 var usersIdContainer Container
 var articlesIdContainer Container
-var commandCounter = 0
+var isUseTestSchema = false
 var loremText = "Lorem Ipsum - это текст-\"рыба\", часто используемый в печати и вэб-дизайне. Lorem Ipsum является стандартной \"рыбой\" для текстов на латинице с начала XVI века. В то время некий безымянный печатник создал большую коллекцию размеров и форм шрифтов, используя Lorem Ipsum для распечатки образцов. Lorem Ipsum не только успешно пережил без заметных изменений пять веков, но и перешагнул в электронный дизайн. Его популяризации в новое время послужили публикация листов Letraset с образцами Lorem Ipsum в 60-х годах и, в более недавнее время, программы электронной вёрстки типа Aldus PageMaker, в шаблонах которых используется Lorem Ipsum."
 
 var wg sync.WaitGroup
 
-func StartTest(amountRows, poolCountSize, passTestCount int) {
+func StartTest(amountRows, poolCountSize, passTestCount, useTestSchema int) {
 	amount = amountRows
 	poolCount = poolCountSize
+
+	if useTestSchema != 0 {
+		isUseTestSchema = true
+	}
 
 	countInWorker = int(amount / poolCount)
 
@@ -66,28 +72,39 @@ func StartTest(amountRows, poolCountSize, passTestCount int) {
 	}
 
 	// select with joins
-	//selectWithJoins(db)
+	if passTestCount < 5 {
+		selectWithJoins(client, ctx)
+	}
 
 	// select with filter
-	//selectWithFilters(db)
+	if passTestCount < 6 {
+		selectWithFilters(client, ctx)
+	}
 
 	// select with joins and filters
-	//selectWithJoinsAndFilters(db)
+	if passTestCount < 7 {
+		selectWithJoinsAndFilters(client, ctx)
+	}
 
 	// add nullable column
-	//addNullableColumn(db)
+	if passTestCount < 8 {
+		addNullableColumn(client, ctx)
+	}
 
 	// add column with default value
-	//addNullableWithDefault(db)
+	if passTestCount < 9 {
+		addNullableWithDefault(client, ctx)
+	}
 
 	// drop column test
-	//dropColumn(db)
-
-	// multiline insert
-	//multilineInsertArticles(db)
+	if passTestCount < 10 {
+		dropColumn(client, ctx)
+	}
 
 	// bulk insert
-	//bulkCopy(db)
+	if passTestCount < 11 {
+		bulkCopy(client, ctx)
+	}
 }
 
 func closeDb(client *mongo.Client, ctx context.Context,
@@ -121,7 +138,7 @@ func connect(uri string) (*mongo.Client, context.Context,
 	// ctx will be used to set deadline for process, here
 	// deadline will of 30 seconds.
 	ctx, cancel := context.WithTimeout(context.Background(),
-		30*time.Second)
+		30*time.Hour)
 
 	// mongo.Connect return mongo.Client method
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
@@ -142,6 +159,10 @@ func ping(client *mongo.Client, ctx context.Context) error {
 }
 
 func insertUsers(client *mongo.Client, ctx context.Context) {
+	if isUseTestSchema == true {
+		amount = 100000
+	}
+	countInWorker = int(amount / poolCount)
 	start := time.Now()
 	log.Print("========== INSERT ============")
 	log.Printf("Insert %d users in progress...", amount)
@@ -155,7 +176,7 @@ func insertUsers(client *mongo.Client, ctx context.Context) {
 			defer wg.Done()
 			maxDiapason := (i + 1) * countInWorker
 			for currentPosition := i * countInWorker; currentPosition < maxDiapason; currentPosition++ {
-				name := fmt.Sprint("name_", currentPosition)
+				name := fmt.Sprint("user_", currentPosition)
 				descr := fmt.Sprint("descr_", currentPosition)
 
 				result, err := collection.InsertOne(ctx, bson.D{
@@ -181,6 +202,12 @@ func insertUsers(client *mongo.Client, ctx context.Context) {
 }
 
 func insertArticles(client *mongo.Client, ctx context.Context) {
+	if isUseTestSchema == true {
+		amount = 1000000
+	}
+	countInWorker = int(amount / poolCount)
+	var authorId int
+
 	start := time.Now()
 	log.Print("========== INSERT ARTICLES ============")
 	log.Printf("Insert %d articles in progress...", amount)
@@ -196,9 +223,10 @@ func insertArticles(client *mongo.Client, ctx context.Context) {
 			defer wg.Done()
 			maxDiapason := (i + 1) * countInWorker
 			for currentPosition := i * countInWorker; currentPosition < maxDiapason; currentPosition++ {
-				title := fmt.Sprint("title_", currentPosition)
+				title := fmt.Sprint("article_", currentPosition)
 
-				objectID, err = primitive.ObjectIDFromHex(usersIdContainer.GetByKey(currentPosition))
+				authorId = int(currentPosition / 100)
+				objectID, err = primitive.ObjectIDFromHex(usersIdContainer.GetByKey(authorId))
 				if err != nil {
 					panic(err)
 				}
@@ -228,6 +256,13 @@ func insertArticles(client *mongo.Client, ctx context.Context) {
 }
 
 func insertComments(client *mongo.Client, ctx context.Context) {
+	if isUseTestSchema == true {
+		amount = 10000000
+	}
+	countInWorker = int(amount / poolCount)
+	var authorId int
+	var articleId int
+
 	start := time.Now()
 	log.Print("========== INSERT COMMENTS ============")
 	log.Printf("Insert %d users in progress...", amount)
@@ -246,14 +281,17 @@ func insertComments(client *mongo.Client, ctx context.Context) {
 			maxDiapason := (i + 1) * countInWorker
 
 			for currentPosition := i * countInWorker; currentPosition < maxDiapason; currentPosition++ {
-				title := fmt.Sprint("title_", currentPosition)
+				title := fmt.Sprint("comment_", currentPosition)
 
-				objectIDUser, err = primitive.ObjectIDFromHex(usersIdContainer.GetByKey(currentPosition))
+				authorId = int(currentPosition / 1000)
+				articleId = int(currentPosition / 1000)
+
+				objectIDUser, err = primitive.ObjectIDFromHex(usersIdContainer.GetByKey(authorId))
 				if err != nil {
 					panic(err)
 				}
 
-				objectIDComment, err = primitive.ObjectIDFromHex(articlesIdContainer.GetByKey(currentPosition))
+				objectIDComment, err = primitive.ObjectIDFromHex(articlesIdContainer.GetByKey(articleId))
 				if err != nil {
 					panic(err)
 				}
@@ -284,6 +322,11 @@ func insertComments(client *mongo.Client, ctx context.Context) {
 }
 
 func selectFromIdUsers(client *mongo.Client, ctx context.Context) {
+	if isUseTestSchema == true {
+		amount = 100000
+	}
+	countInWorker = int(amount / poolCount)
+
 	start := time.Now()
 	log.Print("======= SELECT FROM ID =======")
 	log.Printf("Select %d users in progress...", amount)
@@ -323,5 +366,213 @@ func selectFromIdUsers(client *mongo.Client, ctx context.Context) {
 	elapsed := t.Sub(start)
 
 	log.Printf("Inserted %d rows in %s", amount, elapsed)
+	log.Print("==============================")
+}
+
+func selectWithJoins(client *mongo.Client, ctx context.Context) {
+	start := time.Now()
+	log.Print("======= SELECT ALL WITH JOIN =======")
+	log.Printf("Select rows with join ($lookup) in progress...")
+
+	collection := client.Database("test").Collection("users")
+
+	lookupStageArticle := bson.D{
+		{"$lookup", bson.D{{"from", "articles"}, {"localField", "_id"}, {"foreignField", "author_id"}, {"as", "author"}}}}
+
+	lookupStageComments := bson.D{
+		{"$lookup", bson.D{{"from", "comments"}, {"localField", "_id"}, {"foreignField", "author_id"}, {"as", "comments"}}}}
+
+	showLoadedStructCursor, err := collection.Aggregate(ctx, mongo.Pipeline{lookupStageArticle, lookupStageComments})
+	if err != nil {
+		panic(err)
+	}
+
+	countRows := 0
+	for showLoadedStructCursor.Next(ctx) {
+		countRows++
+	}
+
+	t := time.Now()
+	elapsed := t.Sub(start)
+
+	log.Printf("Selected all with join %d rows in %s", countRows, elapsed)
+	log.Print("==============================")
+}
+
+func selectWithFilters(client *mongo.Client, ctx context.Context) {
+	start := time.Now()
+	log.Print("======= SELECT WITH FILTER =======")
+	log.Printf("Select users collection rows with filter in progress...")
+
+	collection := client.Database("test").Collection("users")
+
+	filter := bson.D{
+		{"name", primitive.Regex{Pattern: "er_1", Options: ""}},
+		{"description", primitive.Regex{Pattern: "scr_1", Options: ""}},
+	}
+	showLoadedStructCursor, err := collection.Find(ctx, filter)
+	if err != nil {
+		panic(err)
+	}
+
+	countRows := 0
+	for showLoadedStructCursor.Next(ctx) {
+		countRows++
+	}
+
+	t := time.Now()
+	elapsed := t.Sub(start)
+
+	log.Printf("Selected with filter %d rows in %s", countRows, elapsed)
+	log.Print("==============================")
+}
+
+func selectWithJoinsAndFilters(client *mongo.Client, ctx context.Context) {
+	start := time.Now()
+	log.Print("======= SELECT ALL WITH JOIN AND FILTERS =======")
+	log.Printf("Select rows with join (lookup) and filters (pipelines) in progress...")
+
+	collection := client.Database("test").Collection("users")
+
+	lookupStageArticle := bson.D{
+		{"$lookup", bson.D{{"from", "articles"}, {"localField", "_id"}, {"foreignField", "author_id"}, {"as", "author"}}}}
+
+	lookupStageComments := bson.D{
+		{"$lookup", bson.D{{"from", "comments"}, {"localField", "_id"}, {"foreignField", "author_id"}, {"as", "comments"}}}}
+
+	filterUsers := bson.D{{"$match", bson.D{{"name", bson.D{{"$regex", "er_1"}}}}}}
+
+	showLoadedStructCursor, err := collection.Aggregate(ctx, mongo.Pipeline{lookupStageArticle, lookupStageComments, filterUsers})
+	if err != nil {
+		panic(err)
+	}
+
+	countRows := 0
+	for showLoadedStructCursor.Next(ctx) {
+		countRows++
+	}
+
+	t := time.Now()
+	elapsed := t.Sub(start)
+
+	log.Printf("Selected with filter %d rows in %s", countRows, elapsed)
+	log.Print("==============================")
+}
+
+func addNullableColumn(client *mongo.Client, ctx context.Context) {
+	start := time.Now()
+	log.Print("======= ADD NULLABLE COLUMN =======")
+	log.Printf("Insert nullable column in progress...")
+
+	collection := client.Database("test").Collection("users")
+
+	filter := bson.D{{}}
+	pipe := bson.D{{"$set", bson.M{"nullable": nil}}}
+	res, err := collection.UpdateMany(ctx, filter, pipe)
+	if err != nil {
+		panic(err)
+	}
+
+	countRows := res.ModifiedCount
+
+	t := time.Now()
+	elapsed := t.Sub(start)
+
+	log.Printf("Inserted nullable column in %s to %d rows", elapsed, countRows)
+	log.Print("==============================")
+}
+
+func addNullableWithDefault(client *mongo.Client, ctx context.Context) {
+	start := time.Now()
+	log.Print("======= ADD COLUMN WITH DEFAULT =======")
+	log.Printf("Insert new column with default value in progress...")
+
+	collection := client.Database("test").Collection("users")
+
+	filter := bson.D{{}}
+	pipe := bson.D{{"$set", bson.M{"default_column": "default text in new column"}}}
+	res, err := collection.UpdateMany(ctx, filter, pipe)
+	if err != nil {
+		panic(err)
+	}
+
+	countRows := res.ModifiedCount
+
+	t := time.Now()
+	elapsed := t.Sub(start)
+
+	log.Printf("Inserted new column with default value in %s to %d rows", elapsed, countRows)
+	log.Print("==============================")
+}
+
+func dropColumn(client *mongo.Client, ctx context.Context) {
+	start := time.Now()
+	log.Print("======= DROP COLUMN =======")
+	log.Printf("Drop column in progress...")
+
+	collection := client.Database("test").Collection("users")
+
+	filter := bson.D{{}}
+	pipe := bson.D{{"$unset", bson.M{"default_column": ""}}}
+	res, err := collection.UpdateMany(ctx, filter, pipe)
+	if err != nil {
+		panic(err)
+	}
+
+	countRows := res.ModifiedCount
+
+	t := time.Now()
+	elapsed := t.Sub(start)
+
+	log.Printf("Drop column with default value in %s to %d rows", elapsed, countRows)
+	log.Print("==============================")
+}
+
+func bulkCopy(client *mongo.Client, ctx context.Context) {
+	if isUseTestSchema == true {
+		amount = 1000000
+	}
+	countInWorker = int(amount / poolCount)
+
+	start := time.Now()
+	log.Print("========== BULK INSERT ARTICLES ============")
+	log.Printf("Bulk insert %d articles in progress...", amount)
+
+	var models []mog.WriteModel
+
+	collection := client.Database("test").Collection("articles")
+	opts := options.BulkWrite().SetOrdered(false)
+	var objectID primitive.ObjectID
+	var err error
+
+	for i := 0; i < amount; i++ {
+		title := fmt.Sprint("article_", i)
+
+		authorId := int(i / 1000)
+
+		objectID, err = primitive.ObjectIDFromHex(usersIdContainer.GetByKey(authorId))
+		if err != nil {
+			panic(err)
+		}
+
+		models = append(models, mog.NewInsertOneModel().SetDocument(&Article{
+			ID:          primitive.NewObjectID(),
+			AuthorId:    objectID,
+			Title:       title,
+			Description: loremText,
+		}))
+	}
+
+	res, err := collection.BulkWrite(ctx, models, opts)
+	if err != nil {
+		panic(err)
+	}
+
+	countRows := res.InsertedCount
+
+	t := time.Now()
+	elapsed := t.Sub(start)
+
+	log.Printf("Bulk inserted %d rows in %s", countRows, elapsed)
 	log.Print("==============================")
 }
