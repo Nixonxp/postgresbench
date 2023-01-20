@@ -569,7 +569,7 @@ func bulkCopy(client *mongo.Client, ctx context.Context) {
 			ID:          primitive.NewObjectID(),
 			AuthorId:    objectID,
 			Title:       title,
-			Description: loremText,
+			Description: "text",
 		}))
 	}
 
