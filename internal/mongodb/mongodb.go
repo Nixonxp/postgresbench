@@ -296,7 +296,7 @@ func insertComments(client *mongo.Client, ctx context.Context) {
 					panic(err)
 				}
 
-				result, err := collection.InsertOne(ctx, &Comment{
+				_, err := collection.InsertOne(ctx, &Comment{
 					ID:        primitive.NewObjectID(),
 					ArticleId: objectIDComment,
 					AuthorId:  objectIDUser,
@@ -307,12 +307,13 @@ func insertComments(client *mongo.Client, ctx context.Context) {
 					panic(err)
 				}
 
-				articlesIdContainer.Add(currentPosition, result.InsertedID.(primitive.ObjectID).Hex())
 			}
 		}(collection, countInWorker, i)
 	}
 
 	wg.Wait()
+
+	articlesIdContainer = *NewContainer()
 
 	t := time.Now()
 	elapsed := t.Sub(start)
