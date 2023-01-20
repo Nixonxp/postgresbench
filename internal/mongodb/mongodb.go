@@ -382,7 +382,9 @@ func selectWithJoins(client *mongo.Client, ctx context.Context) {
 	lookupStageComments := bson.D{
 		{"$lookup", bson.D{{"from", "comments"}, {"localField", "_id"}, {"foreignField", "author_id"}, {"as", "comments"}}}}
 
-	showLoadedStructCursor, err := collection.Aggregate(ctx, mongo.Pipeline{lookupStageArticle, lookupStageComments})
+	limitStage := bson.D{{"$limit", 10}}
+
+	showLoadedStructCursor, err := collection.Aggregate(ctx, mongo.Pipeline{lookupStageArticle, lookupStageComments, limitStage})
 	if err != nil {
 		panic(err)
 	}
@@ -410,7 +412,13 @@ func selectWithFilters(client *mongo.Client, ctx context.Context) {
 		{"name", primitive.Regex{Pattern: "er_1", Options: ""}},
 		{"description", primitive.Regex{Pattern: "scr_1", Options: ""}},
 	}
-	showLoadedStructCursor, err := collection.Find(ctx, filter)
+
+	optionsFind := options.Find()
+	optionsFind.SetSort(bson.M{"name": 1})
+	optionsFind.SetSkip(0)
+	optionsFind.SetLimit(10)
+
+	showLoadedStructCursor, err := collection.Find(ctx, filter, optionsFind)
 	if err != nil {
 		panic(err)
 	}
@@ -442,7 +450,9 @@ func selectWithJoinsAndFilters(client *mongo.Client, ctx context.Context) {
 
 	filterUsers := bson.D{{"$match", bson.D{{"name", bson.D{{"$regex", "er_1"}}}}}}
 
-	showLoadedStructCursor, err := collection.Aggregate(ctx, mongo.Pipeline{lookupStageArticle, lookupStageComments, filterUsers})
+	limitStage := bson.D{{"$limit", 10}}
+
+	showLoadedStructCursor, err := collection.Aggregate(ctx, mongo.Pipeline{lookupStageArticle, lookupStageComments, filterUsers, limitStage})
 	if err != nil {
 		panic(err)
 	}
