@@ -364,6 +364,7 @@ func selectWithJoins(db *sql.DB) {
 		 FROM users 
          JOIN articles ON articles.author_id = users.id
 		 JOIN comments ON comments.author_id = users.id
+		 LIMIT 10 OFFSET 1;
          `
 	rows, err := db.Exec(sqlStatement)
 	if err != nil {
@@ -390,6 +391,7 @@ func selectWithFilters(db *sql.DB) {
 	sqlStatement := `SELECT * 
 		 FROM users 
          WHERE name like '%name%' AND MOD(id, 2) = 0
+		 LIMIT 10 OFFSET 1;
          `
 	rows, err := db.Exec(sqlStatement)
 	if err != nil {
@@ -419,6 +421,7 @@ func selectWithJoinsAndFilters(db *sql.DB) {
 		 JOIN comments ON comments.author_id = users.id
 		 WHERE users.name like '%name%' AND MOD(users.id, 2) = 0
 			AND comments.title like '%tit%' AND MOD(comments.author_id, 2) = 0
+		 LIMIT 10 OFFSET 1;
          `
 	rows, err := db.Exec(sqlStatement)
 	if err != nil {
