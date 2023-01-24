@@ -15,7 +15,14 @@ func upAddComments(tx *sql.Tx) error {
 	author_id   bigint references public.users (id),
 	article_id   bigint references public.articles (id),
 	title          TEXT NOT NULL,
-    text   TEXT NOT NULL);`
+    text   TEXT NOT NULL);
+
+	CREATE INDEX comments_id_index
+		  ON comments (id ASC);
+	CREATE INDEX author_id_comments_index
+		  ON comments (author_id ASC);
+	CREATE INDEX article_id_comments_index
+		  ON comments (article_id ASC);`
 	_, err := tx.Exec(query)
 	if err != nil {
 		return err

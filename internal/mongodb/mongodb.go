@@ -10,6 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"log"
+	"math/rand"
 	"sync"
 	"time"
 )
@@ -194,11 +195,29 @@ func insertUsers(client *mongo.Client, ctx context.Context) {
 
 	wg.Wait()
 
+	err := AddIndex(collection, ctx, "_id")
+	if err != nil {
+		panic(err)
+	}
+
 	t := time.Now()
 	elapsed := t.Sub(start)
 
 	log.Printf("Inserted %d rows in %s", amount, elapsed)
 	log.Print("==============================")
+}
+
+func AddIndex(collection *mongo.Collection, ctx context.Context, indexKey string) error {
+	indexName, err := collection.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.M{
+			indexKey: 1, // index in ascending order
+		},
+	})
+	if err != nil {
+		return err
+	}
+	fmt.Println(indexName)
+	return nil
 }
 
 func insertArticles(client *mongo.Client, ctx context.Context) {
@@ -247,6 +266,16 @@ func insertArticles(client *mongo.Client, ctx context.Context) {
 	}
 
 	wg.Wait()
+
+	err := AddIndex(collection, ctx, "_id")
+	if err != nil {
+		panic(err)
+	}
+
+	err = AddIndex(collection, ctx, "author_id")
+	if err != nil {
+		panic(err)
+	}
 
 	t := time.Now()
 	elapsed := t.Sub(start)
@@ -315,6 +344,21 @@ func insertComments(client *mongo.Client, ctx context.Context) {
 
 	articlesIdContainer = *NewContainer()
 
+	err := AddIndex(collection, ctx, "_id")
+	if err != nil {
+		panic(err)
+	}
+
+	err = AddIndex(collection, ctx, "author_id")
+	if err != nil {
+		panic(err)
+	}
+
+	err = AddIndex(collection, ctx, "article_id")
+	if err != nil {
+		panic(err)
+	}
+
 	t := time.Now()
 	elapsed := t.Sub(start)
 
@@ -328,11 +372,13 @@ func selectFromIdUsers(client *mongo.Client, ctx context.Context) {
 	}
 	countInWorker = int(amount / poolCount)
 
-	start := time.Now()
 	log.Print("======= SELECT FROM ID =======")
 	log.Printf("Select %d users in progress...", amount)
 
 	collection := client.Database("test").Collection("users")
+
+	var results []int
+	var result float64
 
 	for i := 0; i < poolCount; i++ {
 		wg.Add(1)
@@ -340,34 +386,46 @@ func selectFromIdUsers(client *mongo.Client, ctx context.Context) {
 			var _ error
 
 			defer wg.Done()
-			maxDiapason := (i + 1) * countInWorker
+			start := time.Now()
 
-			for currentPosition := i * countInWorker; currentPosition < maxDiapason; currentPosition++ {
-				oid, err := primitive.ObjectIDFromHex(usersIdContainer.GetByKey(currentPosition))
-				if err != nil {
-					panic(err)
-				}
+			rand.Seed(time.Now().UnixNano())
+			id := rand.Intn(amount-0+1) + 0
 
-				filter := bson.M{"_id": oid}
-
-				result := collection.FindOne(ctx, filter)
-				if result.Err() != nil {
-					if errors.Is(result.Err(), mongo.ErrNoDocuments) {
-						panic("document not found")
-					}
-					panic("failed to find one user by id: %s due to error: %v")
-				}
+			oid, err := primitive.ObjectIDFromHex(usersIdContainer.GetByKey(id))
+			if err != nil {
+				panic(err)
 			}
+
+			filter := bson.M{"_id": oid}
+
+			result := collection.FindOne(ctx, filter)
+			if result.Err() != nil {
+				if errors.Is(result.Err(), mongo.ErrNoDocuments) {
+					panic("document not found")
+				}
+				panic("failed to find one user by id: %s due to error: %v")
+			}
+			t := time.Now()
+			elapsed := t.Sub(start).Milliseconds()
+
+			results = append(results, int(elapsed))
 		}(collection, countInWorker, i)
 	}
 
 	wg.Wait()
 
-	t := time.Now()
-	elapsed := t.Sub(start)
+	result = float64(sum(results)) / float64(poolCount)
 
-	log.Printf("Inserted %d rows in %s", amount, elapsed)
+	log.Printf("Average time for 1 row from id in %v ms", result)
 	log.Print("==============================")
+}
+
+func sum(arr []int) int {
+	sum := 0
+	for _, valueInt := range arr {
+		sum += valueInt
+	}
+	return sum
 }
 
 func selectWithJoins(client *mongo.Client, ctx context.Context) {

@@ -13,7 +13,10 @@ func upInit(tx *sql.Tx) error {
 	query := `create table users (
 	id          bigint       not null primary key,
 	name          TEXT NOT NULL,
-    description   TEXT NOT NULL);`
+    description   TEXT NOT NULL);
+
+	CREATE INDEX users_id_index
+	  ON users (id ASC);`
 	_, err := tx.Exec(query)
 	if err != nil {
 		return err

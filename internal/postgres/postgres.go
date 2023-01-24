@@ -8,6 +8,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/pressly/goose/v3"
 	"log"
+	"math/rand"
 	"strconv"
 	"sync"
 	"time"
@@ -327,32 +328,47 @@ func selectFromIdUsers(db *sql.DB) {
 		amount = 100000
 	}
 	countInWorker = int(amount / poolCount)
-	start := time.Now()
 	log.Print("======= SELECT FROM ID =======")
 	log.Printf("Select %d users in progress...", amount)
 
+	var results []int
+	var result float64
+
 	for i := 0; i < poolCount; i++ {
 		wg.Add(1)
-		go func(db *sql.DB, countInWorker, i int) {
+		go func(db *sql.DB, i int) {
 			defer wg.Done()
-			maxDiapason := (i + 1) * countInWorker
-			for currentPosition := i * countInWorker; currentPosition < maxDiapason; currentPosition++ {
-				sqlStatement := `SELECT * FROM users WHERE id = $1`
-				_, err := db.Exec(sqlStatement, currentPosition)
-				if err != nil {
-					panic(err)
-				}
-			}
-		}(db, countInWorker, i)
-	}
+			start := time.Now()
 
+			rand.Seed(time.Now().UnixNano())
+			id := rand.Intn(amount-0+1) + 0
+
+			sqlStatement := `SELECT * FROM users WHERE id = $1`
+			_, err := db.Exec(sqlStatement, id)
+			if err != nil {
+				panic(err)
+			}
+
+			t := time.Now()
+			elapsed := t.Sub(start).Milliseconds()
+
+			results = append(results, int(elapsed))
+		}(db, i)
+	}
 	wg.Wait()
 
-	t := time.Now()
-	elapsed := t.Sub(start)
+	result = float64(sum(results)) / float64(poolCount)
 
-	log.Printf("Selected %d rows in %s", amount, elapsed)
+	log.Printf("Average time for 1 row from id in %v ms", result)
 	log.Print("==============================")
+}
+
+func sum(arr []int) int {
+	sum := 0
+	for _, valueInt := range arr {
+		sum += valueInt
+	}
+	return sum
 }
 
 func selectWithJoins(db *sql.DB) {
