@@ -196,6 +196,8 @@ func insertUsers(client *mongo.Client, ctx context.Context) {
 	wg.Wait()
 
 	err := AddIndex(collection, ctx, "_id")
+	err = AddIndex(collection, ctx, "name")
+	err = AddIndex(collection, ctx, "description")
 	if err != nil {
 		panic(err)
 	}
@@ -370,6 +372,8 @@ func selectFromIdUsers(client *mongo.Client, ctx context.Context) {
 	if isUseTestSchema == true {
 		amount = 100000
 	}
+	start := time.Now()
+
 	countInWorker = int(amount / poolCount)
 
 	log.Print("======= SELECT FROM ID =======")
@@ -377,8 +381,9 @@ func selectFromIdUsers(client *mongo.Client, ctx context.Context) {
 
 	collection := client.Database("test").Collection("users")
 
-	var results []int
+	var results []float64
 	var result float64
+	var selectsPerConnection int = 1000
 
 	for i := 0; i < poolCount; i++ {
 		wg.Add(1)
@@ -388,40 +393,47 @@ func selectFromIdUsers(client *mongo.Client, ctx context.Context) {
 			defer wg.Done()
 			start := time.Now()
 
-			rand.Seed(time.Now().UnixNano())
-			id := rand.Intn(amount-0+1) + 0
+			for i := 0; i < selectsPerConnection; i++ {
+				rand.Seed(time.Now().UnixNano())
+				id := rand.Intn(amount-countInWorker+1) + 0
 
-			oid, err := primitive.ObjectIDFromHex(usersIdContainer.GetByKey(id))
-			if err != nil {
-				panic(err)
-			}
-
-			filter := bson.M{"_id": oid}
-
-			result := collection.FindOne(ctx, filter)
-			if result.Err() != nil {
-				if errors.Is(result.Err(), mongo.ErrNoDocuments) {
-					panic("document not found")
+				oid, err := primitive.ObjectIDFromHex(usersIdContainer.GetByKey(id))
+				if err != nil {
+					panic(err)
 				}
-				panic("failed to find one user by id: %s due to error: %v")
+
+				filter := bson.M{"_id": oid}
+
+				result := collection.FindOne(ctx, filter)
+				if result.Err() != nil {
+					if errors.Is(result.Err(), mongo.ErrNoDocuments) {
+						panic("document not found")
+					}
+					panic("failed to find one user by id: %s due to error: %v")
+				}
 			}
 			t := time.Now()
-			elapsed := t.Sub(start).Milliseconds()
 
-			results = append(results, int(elapsed))
+			elapsed := t.Sub(start).Milliseconds()
+			results = append(results, 1000/(float64(elapsed)/1000))
 		}(collection, countInWorker, i)
 	}
 
 	wg.Wait()
 
-	result = float64(sum(results)) / float64(poolCount)
+	averageRPSPerPool := float64(sum(results)) / float64(poolCount)
+	result = averageRPSPerPool * float64(poolCount)
 
-	log.Printf("Average time for 1 row from id in %v ms", result)
+	t := time.Now()
+	elapsed := t.Sub(start)
+
+	log.Printf("Average RPS for %d pools = %.0f selects", poolCount, result)
+	log.Printf("Select test passed in %s", elapsed)
 	log.Print("==============================")
 }
 
-func sum(arr []int) int {
-	sum := 0
+func sum(arr []float64) float64 {
+	var sum float64 = 0
 	for _, valueInt := range arr {
 		sum += valueInt
 	}
@@ -441,7 +453,7 @@ func selectWithJoins(client *mongo.Client, ctx context.Context) {
 	lookupStageComments := bson.D{
 		{"$lookup", bson.D{{"from", "comments"}, {"localField", "_id"}, {"foreignField", "author_id"}, {"as", "comments"}}}}
 
-	limitStage := bson.D{{"$limit", 10}}
+	limitStage := bson.D{{"$limit", 50}}
 
 	showLoadedStructCursor, err := collection.Aggregate(ctx, mongo.Pipeline{lookupStageArticle, lookupStageComments, limitStage})
 	if err != nil {
@@ -468,14 +480,14 @@ func selectWithFilters(client *mongo.Client, ctx context.Context) {
 	collection := client.Database("test").Collection("users")
 
 	filter := bson.D{
-		{"name", primitive.Regex{Pattern: "er_1", Options: ""}},
-		{"description", primitive.Regex{Pattern: "scr_1", Options: ""}},
+		{"name", primitive.Regex{Pattern: "user_1", Options: ""}},
+		{"description", primitive.Regex{Pattern: "descr_1", Options: ""}},
 	}
 
 	optionsFind := options.Find()
 	optionsFind.SetSort(bson.M{"name": 1})
 	optionsFind.SetSkip(0)
-	optionsFind.SetLimit(10)
+	optionsFind.SetLimit(50)
 
 	showLoadedStructCursor, err := collection.Find(ctx, filter, optionsFind)
 	if err != nil {
@@ -507,9 +519,9 @@ func selectWithJoinsAndFilters(client *mongo.Client, ctx context.Context) {
 	lookupStageComments := bson.D{
 		{"$lookup", bson.D{{"from", "comments"}, {"localField", "_id"}, {"foreignField", "author_id"}, {"as", "comments"}}}}
 
-	filterUsers := bson.D{{"$match", bson.D{{"name", bson.D{{"$regex", "er_1"}}}}}}
+	filterUsers := bson.D{{"$match", bson.D{{"name", bson.D{{"$regex", "user_1"}}}}}}
 
-	limitStage := bson.D{{"$limit", 10}}
+	limitStage := bson.D{{"$limit", 50}}
 
 	showLoadedStructCursor, err := collection.Aggregate(ctx, mongo.Pipeline{lookupStageArticle, lookupStageComments, filterUsers, limitStage})
 	if err != nil {
