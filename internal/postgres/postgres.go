@@ -323,7 +323,9 @@ func insertCommentsWithoutReferences(db *sql.DB) {
 	log.Print("==============================")
 }
 
+// оптимальное кол-во потоков rps
 func selectFromIdUsers(db *sql.DB) {
+	start := time.Now()
 	if isUseTestSchema == true {
 		amount = 100000
 	}
@@ -331,40 +333,49 @@ func selectFromIdUsers(db *sql.DB) {
 	log.Print("======= SELECT FROM ID =======")
 	log.Printf("Select %d users in progress...", amount)
 
-	var results []int
+	var results []float64
 	var result float64
+	var selectsPerConnection int = 1000
 
 	for i := 0; i < poolCount; i++ {
 		wg.Add(1)
-		go func(db *sql.DB, i int) {
+		go func(db *sql.DB, countInWorker, i int) {
 			defer wg.Done()
 			start := time.Now()
 
 			rand.Seed(time.Now().UnixNano())
-			id := rand.Intn(amount-0+1) + 0
+			startId := rand.Intn(amount-countInWorker+1) + 0
 
-			sqlStatement := `SELECT * FROM users WHERE id = $1`
-			_, err := db.Exec(sqlStatement, id)
-			if err != nil {
-				panic(err)
+			for i := 0; i < selectsPerConnection; i++ {
+				sqlStatement := `SELECT * FROM users WHERE id = $1`
+				_, err := db.Exec(sqlStatement, startId)
+				if err != nil {
+					panic(err)
+				}
+				startId++
 			}
 
 			t := time.Now()
 			elapsed := t.Sub(start).Milliseconds()
-
-			results = append(results, int(elapsed))
-		}(db, i)
+			results = append(results, 1000/(float64(elapsed)/1000))
+		}(db, countInWorker, i)
 	}
+
 	wg.Wait()
 
-	result = float64(sum(results)) / float64(poolCount)
+	averageRPSPerPool := float64(sum(results)) / float64(poolCount)
+	result = averageRPSPerPool * float64(poolCount)
 
-	log.Printf("Average time for 1 row from id in %v ms", result)
+	t := time.Now()
+	elapsed := t.Sub(start)
+
+	log.Printf("Average RPS for %d pools = %.0f selects", poolCount, result)
+	log.Printf("Select test passed in %s", elapsed)
 	log.Print("==============================")
 }
 
-func sum(arr []int) int {
-	sum := 0
+func sum(arr []float64) float64 {
+	var sum float64 = 0
 	for _, valueInt := range arr {
 		sum += valueInt
 	}
@@ -380,7 +391,7 @@ func selectWithJoins(db *sql.DB) {
 		 FROM users 
          JOIN articles ON articles.author_id = users.id
 		 JOIN comments ON comments.author_id = users.id
-		 LIMIT 10 OFFSET 1;
+		 LIMIT 50 OFFSET 1;
          `
 	rows, err := db.Exec(sqlStatement)
 	if err != nil {
@@ -404,12 +415,15 @@ func selectWithFilters(db *sql.DB) {
 	log.Print("======= SELECT WITH FILTER =======")
 	log.Printf("Select rows with filter in progress...")
 
+	rand.Seed(time.Now().UnixNano())
+	id := rand.Intn(amount-0+1) + 0
+
 	sqlStatement := `SELECT * 
 		 FROM users 
-         WHERE name like '%name%' AND MOD(id, 2) = 0
-		 LIMIT 10 OFFSET 1;
+         WHERE id > $1
+		 LIMIT 50 OFFSET 1;
          `
-	rows, err := db.Exec(sqlStatement)
+	rows, err := db.Exec(sqlStatement, id)
 	if err != nil {
 		panic(err)
 	}
@@ -422,7 +436,7 @@ func selectWithFilters(db *sql.DB) {
 	t := time.Now()
 	elapsed := t.Sub(start)
 
-	log.Printf("Selected with filter %d rows in %s", countRows, elapsed)
+	log.Printf("Selected with filter (filter id > %d) %d rows in %s", id, countRows, elapsed)
 	log.Print("==============================")
 }
 
@@ -431,15 +445,17 @@ func selectWithJoinsAndFilters(db *sql.DB) {
 	log.Print("======= SELECT ALL WITH JOIN AND FILTERS =======")
 	log.Printf("Select rows with join and filters in progress...")
 
+	rand.Seed(time.Now().UnixNano())
+	id := rand.Intn(amount-0+1) + 0
+
 	sqlStatement := `SELECT * 
 		 FROM users 
          JOIN articles ON articles.author_id = users.id
 		 JOIN comments ON comments.author_id = users.id
-		 WHERE users.name like '%name%' AND MOD(users.id, 2) = 0
-			AND comments.title like '%tit%' AND MOD(comments.author_id, 2) = 0
-		 LIMIT 10 OFFSET 1;
+		 WHERE comments.id > $1
+		 LIMIT 50 OFFSET 1;
          `
-	rows, err := db.Exec(sqlStatement)
+	rows, err := db.Exec(sqlStatement, id)
 	if err != nil {
 		panic(err)
 	}
@@ -452,7 +468,7 @@ func selectWithJoinsAndFilters(db *sql.DB) {
 	t := time.Now()
 	elapsed := t.Sub(start)
 
-	log.Printf("Selected all with join and filters %d rows in %s", countRows, elapsed)
+	log.Printf("Selected (filter id > %d) all with join and filters %d rows in %s", id, countRows, elapsed)
 	log.Print("==============================")
 }
 
