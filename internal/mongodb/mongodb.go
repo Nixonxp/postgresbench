@@ -4,13 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/valyala/fastrand"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"log"
-	"math/rand"
 	"sync"
 	"time"
 )
@@ -394,10 +394,9 @@ func selectFromIdUsers(client *mongo.Client, ctx context.Context) {
 			start := time.Now()
 
 			for i := 0; i < selectsPerConnection; i++ {
-				rand.Seed(int64(i))
-				id := rand.Intn(amount-countInWorker+1) + 0
+				id := fastrand.Uint32n(uint32(amount - countInWorker))
 
-				oid, err := primitive.ObjectIDFromHex(usersIdContainer.GetByKey(id))
+				oid, err := primitive.ObjectIDFromHex(usersIdContainer.GetByKey(int(id)))
 				if err != nil {
 					panic(err)
 				}

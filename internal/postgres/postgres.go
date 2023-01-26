@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/lib/pq"
 	"github.com/pressly/goose/v3"
+	"github.com/valyala/fastrand"
 	"log"
 	"math/rand"
 	"strconv"
@@ -344,14 +345,12 @@ func selectFromIdUsers(db *sql.DB) {
 			start := time.Now()
 
 			for i := 0; i < selectsPerConnection; i++ {
-				rand.Seed(int64(i))
-				startId := rand.Intn(amount-countInWorker+1) + 0
+				id := fastrand.Uint32n(uint32(amount - countInWorker))
 				sqlStatement := `SELECT * FROM users WHERE id = $1`
-				_, err := db.Exec(sqlStatement, startId)
+				_, err := db.Exec(sqlStatement, id)
 				if err != nil {
 					panic(err)
 				}
-				startId++
 			}
 
 			t := time.Now()
