@@ -394,7 +394,7 @@ func selectFromIdUsers(client *mongo.Client, ctx context.Context) {
 			start := time.Now()
 
 			for i := 0; i < selectsPerConnection; i++ {
-				rand.Seed(time.Now().UnixNano())
+				rand.Seed(int64(i))
 				id := rand.Intn(amount-countInWorker+1) + 0
 
 				oid, err := primitive.ObjectIDFromHex(usersIdContainer.GetByKey(id))

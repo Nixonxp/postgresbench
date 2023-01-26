@@ -343,10 +343,9 @@ func selectFromIdUsers(db *sql.DB) {
 			defer wg.Done()
 			start := time.Now()
 
-			rand.Seed(time.Now().UnixNano())
-			startId := rand.Intn(amount-countInWorker+1) + 0
-
 			for i := 0; i < selectsPerConnection; i++ {
+				rand.Seed(int64(i))
+				startId := rand.Intn(amount-countInWorker+1) + 0
 				sqlStatement := `SELECT * FROM users WHERE id = $1`
 				_, err := db.Exec(sqlStatement, startId)
 				if err != nil {
